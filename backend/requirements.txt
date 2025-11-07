@@ -1,0 +1,48 @@
+# FastAPI 및 웹 서버
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+
+# 데이터베이스
+sqlalchemy==2.0.23
+alembic==1.12.1
+psycopg2-binary==2.9.9
+
+# 문서 처리
+PyPDF2==3.0.1
+pdfplumber==0.10.3
+python-docx==1.1.0
+openpyxl==3.1.2
+pytesseract==0.3.10
+Pillow==10.1.0
+
+# AI/ML
+langchain==0.0.350
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+transformers==4.35.2
+torch==2.1.1
+numpy==1.24.3
+
+# Ollama 클라이언트
+ollama==0.1.4
+
+# Hugging Face
+huggingface-hub==0.19.4
+transformers==4.35.2
+
+# 유틸리티
+pydantic==2.5.0
+pydantic-settings==2.1.0
+aiofiles==23.2.1
+httpx==0.25.2
+
+# 모니터링
+psutil==5.9.6
+
+# 암호화
+cryptography==41.0.7
+
