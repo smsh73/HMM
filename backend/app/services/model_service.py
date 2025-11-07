@@ -41,7 +41,7 @@ class ModelService:
             print(f"모델 목록 조회 오류: {e}")
             return []
     
-    async def download_model(self, model_name: str) -> Dict[str, Any]:
+    async def download_model(self, model_name: str, auto_serve: bool = False) -> Dict[str, Any]:
         """모델 다운로드"""
         # 데이터베이스에 모델 정보 저장
         local_model = self.db.query(LocalModel).filter(
@@ -81,6 +81,18 @@ class ModelService:
                                         local_model.is_downloaded = True
                                         local_model.download_progress = 100
                                         self.db.commit()
+                                        
+                                        # 자동 서빙 시작
+                                        if auto_serve:
+                                            try:
+                                                from app.services.model_serving_service import ModelServingService
+                                                serving_service = ModelServingService(self.db)
+                                                await serving_service.start_serving(
+                                                    model_id=model_name,
+                                                    model_type="ollama"
+                                                )
+                                            except Exception as e:
+                                                print(f"자동 서빙 시작 오류: {e}")
                                 except:
                                     pass
             

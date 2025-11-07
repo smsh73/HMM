@@ -17,9 +17,12 @@ import {
   InputLabel,
   CircularProgress,
   Alert,
+  Drawer,
+  IconButton,
+  ListItemButton,
 } from '@mui/material';
-import { Send as SendIcon, SmartToy as AIIcon, Person as PersonIcon } from '@mui/icons-material';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { Send as SendIcon, SmartToy as AIIcon, Person as PersonIcon, Menu as MenuIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -38,10 +41,11 @@ const ChatPage: React.FC = () => {
   const [useMainSystem, setUseMainSystem] = useState(true);
   const [provider, setProvider] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationsDrawerOpen, setConversationsDrawerOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: providers } = useQuery({
-    queryKey: ['llm-providers'],
+    queryKey: ['llm-providers', useMainSystem],
     queryFn: async () => {
       const response = await api.get('/llm/providers', {
         params: { is_main_system: useMainSystem },
@@ -49,6 +53,38 @@ const ChatPage: React.FC = () => {
       return response.data.providers;
     },
   });
+
+  const { data: conversations } = useQuery({
+    queryKey: ['chat-conversations'],
+    queryFn: async () => {
+      const response = await api.get('/chat/conversations');
+      return response.data.conversations;
+    },
+  });
+
+  const { data: chatHistory, refetch: refetchHistory } = useQuery({
+    queryKey: ['chat-history', conversationId],
+    queryFn: async () => {
+      if (!conversationId) return { messages: [] };
+      const response = await api.get('/chat/history', {
+        params: { conversation_id: conversationId },
+      });
+      return response.data;
+    },
+    enabled: !!conversationId,
+  });
+
+  useEffect(() => {
+    if (chatHistory?.messages) {
+      const loadedMessages = chatHistory.messages.map((msg: any) => ({
+        role: msg.role,
+        content: msg.content,
+        sources: msg.sources,
+        timestamp: new Date(msg.created_at),
+      }));
+      setMessages(loadedMessages);
+    }
+  }, [chatHistory]);
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -77,9 +113,27 @@ const ChatPage: React.FC = () => {
       setInput('');
       if (data.conversation_id) {
         setConversationId(data.conversation_id);
+        refetchHistory();
+      }
+      // 대화 목록 새로고침
+      queryClient.invalidateQueries({ queryKey: ['chat-conversations'] });
+    },
+  });
+
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/chat/conversations/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-conversations'] });
+      if (conversationId === conversations?.find((c: any) => c.id === conversationId)?.id) {
+        setConversationId(null);
+        setMessages([]);
       }
     },
   });
+
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -97,9 +151,23 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  const handleSelectConversation = (id: string) => {
+    setConversationId(id);
+    setConversationsDrawerOpen(false);
+  };
+
+  const handleNewConversation = () => {
+    setConversationId(null);
+    setMessages([]);
+    setConversationsDrawerOpen(false);
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 200px)' }}>
       <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <IconButton onClick={() => setConversationsDrawerOpen(true)}>
+          <MenuIcon />
+        </IconButton>
         <Typography variant="h4">AI 채팅</Typography>
         <FormControlLabel
           control={
@@ -128,12 +196,58 @@ const ChatPage: React.FC = () => {
               ?.filter((p: any) => p.is_active)
               .map((p: any) => (
                 <MenuItem key={p.id} value={p.provider_name}>
-                  {p.provider_name} ({p.model_name || 'default'})
+                  {p.provider_name} ({p.provider_name || 'default'})
                 </MenuItem>
               ))}
           </Select>
         </FormControl>
       </Box>
+
+      <Drawer
+        anchor="left"
+        open={conversationsDrawerOpen}
+        onClose={() => setConversationsDrawerOpen(false)}
+      >
+        <Box sx={{ width: 300, p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            대화 목록
+          </Typography>
+          <Button
+            variant="contained"
+            fullWidth
+            sx={{ mb: 2 }}
+            onClick={handleNewConversation}
+          >
+            새 대화
+          </Button>
+          <List>
+            {conversations?.map((conv: any) => (
+              <ListItem
+                key={conv.id}
+                secondaryAction={
+                  <IconButton
+                    edge="end"
+                    onClick={() => deleteConversationMutation.mutate(conv.id)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                }
+                disablePadding
+              >
+                <ListItemButton
+                  selected={conversationId === conv.id}
+                  onClick={() => handleSelectConversation(conv.id)}
+                >
+                  <ListItemText
+                    primary={conv.title}
+                    secondary={new Date(conv.updated_at).toLocaleString('ko-KR')}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
 
       <Paper
         sx={{
@@ -267,4 +381,3 @@ const ChatPage: React.FC = () => {
 };
 
 export default ChatPage;
-

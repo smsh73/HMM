@@ -38,12 +38,13 @@ async def get_local_models(
 @router.post("/download/{model_name}")
 async def download_model(
     model_name: str,
+    auto_serve: bool = False,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """모델 다운로드"""
     model_service = ModelService(db)
-    result = await model_service.download_model(model_name)
+    result = await model_service.download_model(model_name, auto_serve=auto_serve)
     return result
 
 

@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.api.dependencies import get_current_user
 from app.services.llm_service import LLMService
 from app.services.search_service import SearchService
+from app.services.chat_service import ChatService
 from app.models.database import User
 
 router = APIRouter(prefix="/chat", tags=["AI 채팅"])
@@ -46,6 +47,23 @@ async def chat(
     """AI 채팅"""
     llm_service = LLMService(db)
     search_service = SearchService(db)
+    chat_service = ChatService(db)
+    
+    # 대화 조회 또는 생성
+    conversation = chat_service.get_or_create_conversation(
+        conversation_id=request.conversation_id,
+        user_id=current_user.id,
+        use_rag=request.use_rag,
+        use_main_system=request.use_main_system,
+        provider_name=request.provider_name
+    )
+    
+    # 사용자 메시지 저장
+    chat_service.add_message(
+        conversation_id=conversation.id,
+        role="user",
+        content=request.message
+    )
     
     # RAG 사용 시 문서 검색
     context = ""
@@ -88,15 +106,22 @@ async def chat(
             )
         
         response_text = await provider.generate(prompt)
+        provider_name = request.provider_name or "default"
         
-        # 대화 ID 생성 (간단한 구현)
-        conversation_id = request.conversation_id or f"conv_{datetime.utcnow().timestamp()}"
+        # AI 응답 저장
+        chat_service.add_message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=response_text,
+            sources=sources,
+            provider=provider_name
+        )
         
         return ChatResponse(
             response=response_text,
-            conversation_id=conversation_id,
+            conversation_id=conversation.id,
             sources=sources,
-            provider=request.provider_name or "default"
+            provider=provider_name
         )
     except Exception as e:
         raise HTTPException(
@@ -105,14 +130,54 @@ async def chat(
         )
 
 
-@router.get("/history")
-async def get_chat_history(
-    conversation_id: Optional[str] = None,
+@router.get("/conversations")
+async def get_conversations(
     limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """채팅 기록 조회 (향후 구현)"""
-    # 채팅 기록 저장 기능은 향후 구현
-    return {"messages": []}
+    """사용자의 대화 목록 조회"""
+    chat_service = ChatService(db)
+    conversations = chat_service.get_conversations(
+        user_id=current_user.id,
+        limit=limit
+    )
+    return {"conversations": conversations}
+
+
+@router.get("/history")
+async def get_chat_history(
+    conversation_id: str,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """채팅 기록 조회"""
+    chat_service = ChatService(db)
+    messages = chat_service.get_messages(
+        conversation_id=conversation_id,
+        user_id=current_user.id,
+        limit=limit
+    )
+    return {"messages": messages}
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """대화 삭제"""
+    chat_service = ChatService(db)
+    success = chat_service.delete_conversation(
+        conversation_id=conversation_id,
+        user_id=current_user.id
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="대화를 찾을 수 없습니다."
+        )
+    return {"message": "대화가 삭제되었습니다."}
 

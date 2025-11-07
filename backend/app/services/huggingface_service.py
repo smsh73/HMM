@@ -105,7 +105,8 @@ class HuggingFaceService:
     async def download_model(
         self,
         model_id: str,
-        model_type: str = "transformers"
+        model_type: str = "transformers",
+        auto_serve: bool = False
     ) -> Dict[str, Any]:
         """모델 다운로드"""
         # 데이터베이스에 모델 정보 저장

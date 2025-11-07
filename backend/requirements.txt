@@ -46,3 +46,8 @@ psutil==5.9.6
 # 암호화
 cryptography==41.0.7
 
+# 테스트
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+

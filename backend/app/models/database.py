@@ -140,3 +140,36 @@ class RAGSync(Base):
     error_message = Column(Text)  # 오류 메시지
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime)
+
+
+class ChatConversation(Base):
+    """채팅 대화 모델"""
+    __tablename__ = "chat_conversations"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    title = Column(String)  # 대화 제목 (첫 메시지 기반)
+    use_rag = Column(Boolean, default=False)
+    use_main_system = Column(Boolean, default=True)
+    provider_name = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # 관계
+    messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+
+class ChatMessage(Base):
+    """채팅 메시지 모델"""
+    __tablename__ = "chat_messages"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    conversation_id = Column(String, ForeignKey("chat_conversations.id"), nullable=False)
+    role = Column(String, nullable=False)  # user, assistant, system
+    content = Column(Text, nullable=False)
+    sources = Column(JSON)  # RAG 출처 정보
+    provider = Column(String)  # 사용된 프로바이더
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # 관계
+    conversation = relationship("ChatConversation", back_populates="messages")
