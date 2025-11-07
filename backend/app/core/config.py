@@ -27,9 +27,10 @@ class Settings(BaseSettings):
     ]
     
     # 데이터베이스 설정
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/hmm_db"
-    # SQLite 대체 (개발용)
-    # DATABASE_URL: str = "sqlite:///./data/documents.db"
+    # PostgreSQL (프로덕션)
+    # DATABASE_URL: str = "postgresql://user:password@localhost:5432/hmm_db"
+    # SQLite (개발/테스트용)
+    DATABASE_URL: str = "sqlite:///./data/documents.db"
     
     # 파일 업로드 설정
     UPLOAD_DIR: str = "./data/uploads"

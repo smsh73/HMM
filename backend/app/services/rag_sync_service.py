@@ -69,13 +69,13 @@ class RAGSyncService:
                         "id": doc.id,
                         "filename": doc.filename,
                         "file_type": doc.file_type,
-                        "metadata": doc.metadata,
+                        "metadata": doc.doc_metadata,
                         "chunks": [
                             {
                                 "id": chunk.id,
                                 "chunk_index": chunk.chunk_index,
                                 "embedding_id": chunk.embedding_id,
-                                "metadata": chunk.metadata
+                                "metadata": chunk.chunk_metadata
                             }
                             for chunk in doc.chunks
                         ]

@@ -53,7 +53,7 @@ class DocumentResponse(BaseModel):
     upload_date: datetime
     is_parsed: bool
     is_indexed: bool
-    metadata: Optional[Dict[str, Any]] = None
+    doc_metadata: Optional[Dict[str, Any]] = None
     
     class Config:
         from_attributes = True

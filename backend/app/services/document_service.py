@@ -78,6 +78,12 @@ class DocumentService:
                 "word_count": parsed_doc.metadata.word_count
             }
         }
+        document.doc_metadata = {
+            "title": parsed_doc.metadata.title,
+            "author": parsed_doc.metadata.author,
+            "page_count": parsed_doc.metadata.page_count,
+            "word_count": parsed_doc.metadata.word_count
+        }
         document.is_parsed = True
         
         # 청크 저장
@@ -86,10 +92,10 @@ class DocumentService:
                 document_id=document.id,
                 chunk_index=chunk.chunk_index,
                 content=chunk.content,
-                metadata={
+                chunk_metadata={
                     "page_number": chunk.page_number,
                     "section_title": chunk.section_title,
-                    **chunk.metadata or {}
+                    **(chunk.metadata if hasattr(chunk, 'metadata') and chunk.metadata else {})
                 }
             )
             self.db.add(db_chunk)
@@ -121,7 +127,7 @@ class DocumentService:
             {
                 "content": chunk.content,
                 "chunk_index": chunk.chunk_index,
-                "metadata": chunk.metadata or {}
+                "metadata": chunk.chunk_metadata or {}
             }
             for chunk in chunks
         ]

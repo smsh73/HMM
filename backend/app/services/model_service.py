@@ -53,7 +53,8 @@ class ModelService:
                 model_name=model_name,
                 model_type="ollama",
                 is_downloaded=False,
-                download_progress=0
+                download_progress=0,
+                model_metadata={}
             )
             self.db.add(local_model)
         else:
@@ -124,7 +125,7 @@ class ModelService:
                 "model_size": m.model_size,
                 "is_downloaded": m.is_downloaded,
                 "download_progress": m.download_progress,
-                "metadata": m.metadata,
+                "metadata": m.model_metadata,
                 "created_at": m.created_at.isoformat() if m.created_at else None,
                 "updated_at": m.updated_at.isoformat() if m.updated_at else None
             }

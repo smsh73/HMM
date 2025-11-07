@@ -120,7 +120,7 @@ class HuggingFaceService:
                 model_type=model_type,
                 is_downloaded=False,
                 download_progress=0,
-                metadata={"source": "huggingface"}
+                model_metadata={"source": "huggingface"}
             )
             self.db.add(local_model)
         else:
@@ -150,15 +150,15 @@ class HuggingFaceService:
                     )
                     local_model.is_downloaded = True
                     local_model.download_progress = 100
-                    local_model.metadata = {
-                        **local_model.metadata,
+                    local_model.model_metadata = {
+                        **(local_model.model_metadata or {}),
                         "model_path": model_path
                     }
                     self.db.commit()
                 except Exception as e:
                     local_model.download_progress = 0
-                    local_model.metadata = {
-                        **local_model.metadata,
+                    local_model.model_metadata = {
+                        **(local_model.model_metadata or {}),
                         "error": str(e)
                     }
                     self.db.commit()
@@ -195,7 +195,7 @@ class HuggingFaceService:
                 "model_type": m.model_type,
                 "is_downloaded": m.is_downloaded,
                 "download_progress": m.download_progress,
-                "metadata": m.metadata,
+                "metadata": m.model_metadata,
                 "created_at": m.created_at.isoformat() if m.created_at else None
             }
             for m in models

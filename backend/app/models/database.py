@@ -2,7 +2,6 @@
 데이터베이스 모델
 """
 from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey, JSON, Boolean
-from sqlalchemy.dialects.sqlite import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -38,7 +37,7 @@ class Document(Base):
     file_size = Column(Integer, nullable=False)
     upload_date = Column(DateTime, default=datetime.utcnow)
     parsed_content = Column(JSON)  # 파싱된 내용 구조
-    metadata = Column(JSON)  # 문서 메타데이터
+    doc_metadata = Column(JSON)  # 문서 메타데이터 (metadata는 SQLAlchemy 예약어)
     created_by = Column(String, ForeignKey("users.id"))
     is_parsed = Column(Boolean, default=False)
     is_indexed = Column(Boolean, default=False)
@@ -57,7 +56,7 @@ class DocumentChunk(Base):
     document_id = Column(String, ForeignKey("documents.id"), nullable=False)
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
-    metadata = Column(JSON)  # 청크 메타데이터 (페이지 번호, 섹션 등)
+    chunk_metadata = Column(JSON)  # 청크 메타데이터 (페이지 번호, 섹션 등)
     embedding_id = Column(String)  # 벡터 DB의 ID
     created_at = Column(DateTime, default=datetime.utcnow)
     
@@ -120,7 +119,7 @@ class LocalModel(Base):
     model_size = Column(Integer)  # 모델 크기 (bytes)
     is_downloaded = Column(Boolean, default=False)
     download_progress = Column(Integer, default=0)  # 다운로드 진행률 (0-100)
-    metadata = Column(JSON)  # 모델 메타데이터
+    model_metadata = Column(JSON)  # 모델 메타데이터
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
