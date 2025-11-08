@@ -67,6 +67,11 @@ class SearchRequest(BaseModel):
     filter_dict: Optional[Dict[str, Any]] = None
     use_main_system: Optional[bool] = True
     provider_name: Optional[str] = None
+    
+    class Config:
+        # 입력 검증
+        min_length = {"query": 1}
+        max_length = {"query": 1000}
 
 
 class SearchResultResponse(BaseModel):
