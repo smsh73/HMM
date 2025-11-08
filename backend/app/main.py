@@ -4,10 +4,11 @@ FastAPI 메인 애플리케이션
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 import os
 import traceback
+from pathlib import Path
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -39,6 +40,11 @@ if not os.path.exists(settings.UPLOAD_DIR):
     os.makedirs(settings.UPLOAD_DIR)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
+# 프론트엔드 정적 파일 서빙
+FRONTEND_BUILD_DIR = Path(__file__).parent.parent.parent / "frontend" / "build"
+if FRONTEND_BUILD_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD_DIR / "static")), name="static")
+
 
 # 전역 예외 처리
 @app.exception_handler(Exception)
@@ -64,20 +70,25 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-@app.get("/")
-async def root():
-    """루트 엔드포인트"""
+@app.get("/health")
+async def health_check():
+    """헬스 체크 엔드포인트"""
+    return {"status": "healthy"}
+
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """프론트엔드 SPA 서빙"""
+    if FRONTEND_BUILD_DIR.exists():
+        file_path = FRONTEND_BUILD_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(FRONTEND_BUILD_DIR / "index.html")
     return {
         "message": "GenAI 문서 검색/요약 시스템 API",
         "version": "1.0.0",
         "docs": "/api/docs"
     }
-
-
-@app.get("/health")
-async def health_check():
-    """헬스 체크 엔드포인트"""
-    return {"status": "healthy"}
 
 
 if __name__ == "__main__":

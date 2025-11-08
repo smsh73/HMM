@@ -22,12 +22,8 @@ HMM㈜의 선박 환경을 위한 온/오프라인 문서 검색 및 요약 시�
 │   ├── data/         # 데이터 디렉토리 (SQLite DB, 업로드, 로그)
 │   └── .env          # 환경 변수 설정
 ├── frontend/          # React + TypeScript 프론트엔드
-│   ├── src/
-│   │   ├── components/ # React 컴포넌트
-│   │   ├── pages/      # 페이지 컴포넌트
-│   │   ├── services/   # API 서비스
-│   │   └── hooks/      # 커스텀 훅
-│   └── .env            # 프론트엔드 환경 변수
+│   ├── src/          # 소스 코드
+│   └── build/        # 프로덕션 빌드 (백엔드가 제공)
 └── docs/              # 프로젝트 문서
 ```
 
@@ -38,8 +34,9 @@ HMM㈜의 선박 환경을 위한 온/오프라인 문서 검색 및 요약 시�
 - 백엔드/프론트엔드 의존성 설치
 - SQLite 데이터베이스 초기화
 - 기본 관리자 계정 생성 (username: admin, password: admin123)
-- CORS 설정 (Replit 도메인 허용)
-- 워크플로우 설정 (백엔드: 포트 8000, 프론트엔드: 포트 5000)
+- **통합 서버 설정**: 백엔드가 포트 5000에서 API와 프론트엔드 모두 제공
+- 프론트엔드 프로덕션 빌드 완료
+- CORS 설정 (모든 도메인 허용)
 
 ### ⚠️ 제한사항
 - **AI/ML 라이브러리 미설치**: 디스크 용량 제약으로 대형 AI/ML 라이브러리 (PyTorch, FAISS, Sentence Transformers) 미설치
@@ -57,16 +54,41 @@ AI/ML 기능을 활성화하려면:
 3. `backend/app/api/router.py`에서 주석 처리된 라우터 활성화
 4. 워크플로우 재시작
 
+## 배포 아키텍처
+
+### 통합 서버 구조
+- **단일 포트**: 백엔드 서버가 포트 5000에서 실행
+- **API 경로**: `/api/*` - FastAPI REST API
+- **프론트엔드**: `/*` - React SPA (프로덕션 빌드)
+- **정적 파일**: `/static/*` - 프론트엔드 JS/CSS
+- **업로드 파일**: `/uploads/*` - 문서 파일
+
+### 장점
+- Replit 환경에서 단일 포트(5000)만 외부 노출
+- CORS 문제 없음 (같은 도메인)
+- 프록시 불필요
+- 배포 간소화
+
 ## 로컬 개발 설정
 
-### 백엔드 실행
+### 통합 서버 실행 (권장)
 ```bash
-cd backend
-python -m uvicorn app.main:app --host localhost --port 8000 --reload
+# 프론트엔드 빌드
+cd frontend
+npm run build
+
+# 백엔드 서버 실행 (포트 5000)
+cd ../backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
 ```
 
-### 프론트엔드 실행
+### 별도 서버 실행 (개발 시)
 ```bash
+# 터미널 1: 백엔드
+cd backend
+python -m uvicorn app.main:app --host localhost --port 8000 --reload
+
+# 터미널 2: 프론트엔드
 cd frontend
 npm start
 ```
@@ -78,8 +100,8 @@ npm start
 
 ## API 문서
 백엔드가 실행되면 다음 URL에서 API 문서를 확인할 수 있습니다:
-- Swagger UI: http://localhost:8000/api/docs
-- ReDoc: http://localhost:8000/api/redoc
+- Swagger UI: http://localhost:5000/api/docs
+- ReDoc: http://localhost:5000/api/redoc
 
 ## 주요 기능
 
@@ -87,6 +109,7 @@ npm start
 - ✅ 사용자 인증 및 권한 관리
 - ✅ 성능 모니터링
 - ✅ 기본 API 인프라
+- ✅ React SPA 프론트엔드
 
 ### AI 라이브러리 설치 후 사용 가능
 - 📄 문서 업로드 및 파싱 (PDF, Word, Excel)
@@ -104,17 +127,9 @@ SECRET_KEY=your-secret-key-change-in-production
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama2:7b
 EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-HOST=localhost
-PORT=8000
-LOG_LEVEL=INFO
-```
-
-### Frontend (.env)
-```
-REACT_APP_API_URL=https://[your-replit-domain]
+HOST=0.0.0.0
 PORT=5000
-WDS_SOCKET_PORT=0
-DANGEROUSLY_DISABLE_HOST_CHECK=true
+LOG_LEVEL=INFO
 ```
 
 ## 트러블슈팅
@@ -125,13 +140,16 @@ DANGEROUSLY_DISABLE_HOST_CHECK=true
 ### AI 기능 사용 불가
 디스크 용량 부족으로 AI/ML 라이브러리가 설치되지 않은 경우, 위의 "활성화 방법" 섹션 참조.
 
-### 프론트엔드 컴파일 오류
-TypeScript/ESLint 경고는 대부분 무시해도 되나, 빌드 에러 발생 시 누락된 import 확인.
+### 로그인 문제
+- 계정: admin / admin123
+- 프론트엔드와 백엔드가 같은 포트(5000)에서 제공되므로 CORS 문제 없음
+- 브라우저 캐시를 지우고 다시 시도
 
 ## 배포 설정
 - **배포 타겟**: VM (상태 유지가 필요한 앱)
 - **빌드 명령**: `cd frontend && npm run build`
-- **실행 명령**: 백엔드(포트 5000) 및 프론트엔드 병렬 실행
+- **실행 명령**: `cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 5000`
+- **포트**: 5000 (webview)
 
 ## 추가 리소스
 - 프로젝트 README.md
@@ -144,5 +162,7 @@ TypeScript/ESLint 경고는 대부분 무시해도 되나, 빌드 에러 발생 
   - Python 3.11 및 Node.js 20 설치
   - 기본 의존성 설치
   - 데이터베이스 초기화
-  - 워크플로우 설정
+  - 통합 서버 아키텍처 구현 (백엔드 포트 5000에서 API + 프론트엔드 제공)
+  - 프론트엔드 프로덕션 빌드
+  - 워크플로우 단일화
   - AI/ML 라이브러리는 디스크 용량 제약으로 보류
