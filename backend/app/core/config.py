@@ -21,9 +21,12 @@ class Settings(BaseSettings):
     # CORS 설정
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
+        "http://localhost:5000",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5000",
+        "http://127.0.0.1:5173",
+        "https://afc08d6f-5567-4288-9042-6369912be6d2-00-2p1v7qxsirue6.sisko.replit.dev"
     ]
     
     # 데이터베이스 설정
