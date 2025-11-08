@@ -36,7 +36,9 @@ async def summarize_document(
     try:
         result = await summary_service.summarize_document(
             document_id=document_id,
-            summary_type=summary_request.summary_type
+            summary_type=summary_request.summary_type,
+            use_main_system=summary_request.use_main_system,
+            provider_name=summary_request.provider_name
         )
         return result
     except ValueError as e:

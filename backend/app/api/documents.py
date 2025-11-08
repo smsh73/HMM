@@ -9,6 +9,7 @@ import tempfile
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.core.logging import logger
 from app.api.dependencies import get_current_user
 from app.api.schemas import DocumentResponse
 from app.services.document_service import DocumentService
@@ -53,12 +54,21 @@ async def upload_document(
             filename=file.filename,
             user_id=current_user.id
         )
-        
+        logger.info(f"문서 업로드 완료: {file.filename} (사용자: {current_user.username})")
         return document
+    except Exception as e:
+        logger.error(f"문서 업로드 오류: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="문서 업로드 중 오류가 발생했습니다."
+        )
     finally:
         # 임시 파일 삭제
         if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+            try:
+                os.remove(tmp_path)
+            except Exception as e:
+                logger.warning(f"임시 파일 삭제 실패: {e}")
 
 
 @router.get("", response_model=List[DocumentResponse])

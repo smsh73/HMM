@@ -8,6 +8,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core.database import get_db
+from app.core.logging import logger
 from app.api.dependencies import get_current_user
 from app.services.llm_service import LLMService
 from app.services.search_service import SearchService
@@ -29,6 +30,11 @@ class ChatRequest(BaseModel):
     use_rag: bool = False
     use_main_system: bool = True
     provider_name: Optional[str] = None
+    
+    class Config:
+        # 입력 검증
+        min_length = {"message": 1}
+        max_length = {"message": 5000}
 
 
 class ChatResponse(BaseModel):
@@ -45,6 +51,21 @@ async def chat(
     db: Session = Depends(get_db)
 ):
     """AI 채팅"""
+    # 입력 검증
+    if not request.message or not request.message.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="메시지를 입력하세요."
+        )
+    
+    if len(request.message) > 5000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="메시지가 너무 깁니다. (최대 5000자)"
+        )
+    
+    logger.info(f"채팅 요청: 사용자={current_user.username}, RAG={request.use_rag}, 시스템={request.use_main_system}")
+    
     llm_service = LLMService(db)
     search_service = SearchService(db)
     chat_service = ChatService(db)
@@ -117,16 +138,20 @@ async def chat(
             provider=provider_name
         )
         
+        logger.info(f"채팅 응답 생성 완료: 대화ID={conversation.id}, 프로바이더={provider_name}")
         return ChatResponse(
             response=response_text,
             conversation_id=conversation.id,
             sources=sources,
             provider=provider_name
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"채팅 응답 생성 오류: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"답변 생성 오류: {str(e)}"
+            detail="답변 생성 중 오류가 발생했습니다."
         )
 
 

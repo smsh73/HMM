@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024  # 100MB
     ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".doc", ".xlsx", ".xls", ".txt"]
     
+    # 로깅 설정
+    LOG_DIR: str = "./data/logs"
+    LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    
     # JWT 설정
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
@@ -53,10 +57,6 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 200
     MAX_SEARCH_RESULTS: int = 10
     BATCH_SIZE: int = 32
-    
-    # 로깅 설정
-    LOG_LEVEL: str = "INFO"
-    LOG_DIR: str = "./logs"
     
     class Config:
         env_file = ".env"

@@ -65,6 +65,8 @@ class SearchRequest(BaseModel):
     top_k: Optional[int] = 5
     generate_answer: Optional[bool] = False
     filter_dict: Optional[Dict[str, Any]] = None
+    use_main_system: Optional[bool] = True
+    provider_name: Optional[str] = None
 
 
 class SearchResultResponse(BaseModel):
@@ -85,6 +87,8 @@ class SearchResponse(BaseModel):
 # 요약 스키마
 class SummaryRequest(BaseModel):
     summary_type: Optional[str] = "core"  # core, detailed, keywords
+    use_main_system: Optional[bool] = True
+    provider_name: Optional[str] = None
 
 
 class SummaryResponse(BaseModel):

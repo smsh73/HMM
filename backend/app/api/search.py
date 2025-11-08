@@ -27,7 +27,9 @@ async def search(
         user_id=current_user.id,
         top_k=search_request.top_k,
         generate_answer=search_request.generate_answer,
-        filter_dict=search_request.filter_dict
+        filter_dict=search_request.filter_dict,
+        use_main_system=search_request.use_main_system,
+        provider_name=search_request.provider_name
     )
     return result
 
