@@ -1,7 +1,6 @@
 """
 벡터 저장소 관리
 """
-import faiss
 import numpy as np
 import pickle
 import os
@@ -10,6 +9,13 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.ai.embedding import EmbeddingGenerator
+
+try:
+    import faiss
+    HAS_FAISS = True
+except ImportError:
+    HAS_FAISS = False
+    print("Warning: FAISS not available. Vector search will use fallback implementation.")
 
 
 class VectorStore:
