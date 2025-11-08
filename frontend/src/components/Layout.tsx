@@ -55,10 +55,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <Box sx={{ display: 'flex' }}>
       <AppBar
         position="fixed"
-        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        sx={{ 
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          background: 'linear-gradient(135deg, #003D82 0%, #0056B3 100%)',
+        }}
       >
         <Toolbar>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+          <Typography 
+            variant="h6" 
+            noWrap 
+            component="div" 
+            sx={{ 
+              flexGrow: 1,
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+            }}
+          >
             HMM 문서 검색/요약 시스템
           </Typography>
           <Typography variant="body2" sx={{ mr: 2 }}>
