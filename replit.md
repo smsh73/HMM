@@ -43,12 +43,9 @@ HMM㈜의 선박 환경을 위한 온/오프라인 문서 검색 및 요약 시�
   - Sentence Transformers 5.1.2
   - LangChain (최신 버전)
   - FAISS-CPU (AVX2 지원)
-- **모든 AI 기능 활성화**: 30개 AI API 엔드포인트 활성화
-  - 문서 관리 (업로드, 파싱, 인덱싱, 검색)
-  - RAG 기반 검색
-  - LLM 기반 요약
-  - 모델 관리
-  - 채팅 인터페이스
+- **AI API 엔드포인트 활성화**: 30개 AI 관련 API 라우터 활성화
+  - 엔드포인트: documents, search, summary, llm_settings, models, rag_sync, huggingface, model_serving, chat
+  - 주의: 엔드포인트는 활성화되었으나 end-to-end 워크플로우 테스트는 필요
 
 ### 📊 시스템 상태
 - **디스크 사용량**: 약 21GB 사용 가능
@@ -107,18 +104,22 @@ npm start
 
 ## 주요 기능
 
-### ✅ 모든 기능 사용 가능
+### ✅ 검증 완료
 - 👤 사용자 인증 및 권한 관리
+- 📊 성능 모니터링
+- 🔌 30개 AI API 엔드포인트 활성화 (라우터 등록 완료)
+- 🧠 임베딩 생성 모듈 (SentenceTransformer, 384차원)
+- 📁 FAISS 벡터 인덱스 초기화 (AVX2 최적화)
+
+### 🔄 추가 테스트 필요
+다음 기능들은 API가 활성화되었으나 end-to-end 워크플로우 검증이 필요합니다:
 - 📄 문서 업로드 및 파싱 (PDF, Word, Excel)
-- 🔍 RAG 기반 의미 검색 (FAISS 벡터 스토어)
+- 🔍 RAG 기반 의미 검색
 - 📝 LLM 기반 문서 요약
-- 🔐 문서별 접근 권한 제어
 - 🤖 Ollama/Hugging Face 모델 통합
 - 💬 채팅 인터페이스
-- 📊 성능 모니터링
 - ⚙️ LLM 프로바이더 관리
-- 🧠 모델 다운로드 및 관리
-- 🔄 RAG 동기화
+- 🔐 문서별 접근 권한 제어
 
 ## 환경 변수
 
