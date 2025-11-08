@@ -3,7 +3,7 @@ API 라우터 통합
 """
 from fastapi import APIRouter
 
-from app.api import auth, permissions, performance
+from app.api import auth, permissions, performance, dummy
 
 # AI-dependent routers commented out temporarily until ML libraries are installed
 # from app.api import documents, search, summary, llm_settings, models, rag_sync, huggingface, model_serving, chat
@@ -12,6 +12,7 @@ api_router = APIRouter()
 
 # 라우터 등록
 api_router.include_router(auth.router)
+api_router.include_router(dummy.router)  # 더미 응답 제공
 # api_router.include_router(documents.router)
 # api_router.include_router(search.router)
 # api_router.include_router(summary.router)
