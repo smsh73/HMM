@@ -37,22 +37,24 @@ HMM㈜의 선박 환경을 위한 온/오프라인 문서 검색 및 요약 시�
 - **통합 서버 설정**: 백엔드가 포트 5000에서 API와 프론트엔드 모두 제공
 - 프론트엔드 프로덕션 빌드 완료
 - CORS 설정 (모든 도메인 허용)
+- **AI/ML 라이브러리 설치 완료**:
+  - PyTorch 2.0.1 (CPU 전용, 184MB - CUDA 버전 대비 약 700MB 절약)
+  - Transformers 4.44.0
+  - Sentence Transformers 5.1.2
+  - LangChain (최신 버전)
+  - FAISS-CPU (AVX2 지원)
+- **모든 AI 기능 활성화**: 30개 AI API 엔드포인트 활성화
+  - 문서 관리 (업로드, 파싱, 인덱싱, 검색)
+  - RAG 기반 검색
+  - LLM 기반 요약
+  - 모델 관리
+  - 채팅 인터페이스
 
-### ⚠️ 제한사항
-- **AI/ML 라이브러리 미설치**: 디스크 용량 제약으로 대형 AI/ML 라이브러리 (PyTorch, FAISS, Sentence Transformers) 미설치
-- **기능 제한**: 문서 검색, 요약, RAG 기능이 AI 라이브러리에 의존하므로 현재 비활성화됨
-- **활성화된 API**: 인증(auth), 권한(permissions), 성능(performance) 엔드포인트만 활성화
-
-### 🔧 활성화 방법
-AI/ML 기능을 활성화하려면:
-1. 충분한 디스크 공간 확보 (최소 5GB 권장)
-2. 필요 라이브러리 설치:
-   ```bash
-   cd backend
-   pip install sentence-transformers langchain faiss-cpu torch
-   ```
-3. `backend/app/api/router.py`에서 주석 처리된 라우터 활성화
-4. 워크플로우 재시작
+### 📊 시스템 상태
+- **디스크 사용량**: 약 21GB 사용 가능
+- **임베딩 모델**: paraphrase-multilingual-MiniLM-L12-v2 (384 차원)
+- **벡터 스토어**: FAISS (AVX2 최적화)
+- **API 엔드포인트**: 47개 (30개 AI 엔드포인트 포함)
 
 ## 배포 아키텍처
 
@@ -105,18 +107,18 @@ npm start
 
 ## 주요 기능
 
-### 현재 사용 가능
-- ✅ 사용자 인증 및 권한 관리
-- ✅ 성능 모니터링
-- ✅ 기본 API 인프라
-- ✅ React SPA 프론트엔드
-
-### AI 라이브러리 설치 후 사용 가능
+### ✅ 모든 기능 사용 가능
+- 👤 사용자 인증 및 권한 관리
 - 📄 문서 업로드 및 파싱 (PDF, Word, Excel)
-- 🔍 RAG 기반 의미 검색
+- 🔍 RAG 기반 의미 검색 (FAISS 벡터 스토어)
 - 📝 LLM 기반 문서 요약
 - 🔐 문서별 접근 권한 제어
 - 🤖 Ollama/Hugging Face 모델 통합
+- 💬 채팅 인터페이스
+- 📊 성능 모니터링
+- ⚙️ LLM 프로바이더 관리
+- 🧠 모델 다운로드 및 관리
+- 🔄 RAG 동기화
 
 ## 환경 변수
 
@@ -137,13 +139,14 @@ LOG_LEVEL=INFO
 ### bcrypt 경고
 데이터베이스 초기화 시 bcrypt 버전 관련 경고가 표시될 수 있으나, 기능에는 영향 없음.
 
-### AI 기능 사용 불가
-디스크 용량 부족으로 AI/ML 라이브러리가 설치되지 않은 경우, 위의 "활성화 방법" 섹션 참조.
-
 ### 로그인 문제
 - 계정: admin / admin123
 - 프론트엔드와 백엔드가 같은 포트(5000)에서 제공되므로 CORS 문제 없음
 - 브라우저 캐시를 지우고 다시 시도
+
+### AI 모델 로딩 시간
+- 임베딩 모델(paraphrase-multilingual-MiniLM-L12-v2) 첫 로드 시 약 5-10초 소요
+- FAISS 인덱스는 AVX2 최적화로 빠른 검색 성능 제공
 
 ## 배포 설정
 - **배포 타겟**: VM (상태 유지가 필요한 앱)
@@ -166,3 +169,13 @@ LOG_LEVEL=INFO
   - 프론트엔드 프로덕션 빌드
   - 워크플로우 단일화
   - AI/ML 라이브러리는 디스크 용량 제약으로 보류
+- **2025-11-08 (오후)**: AI/ML 기능 활성화 완료
+  - PyTorch 2.0.1 CPU 버전 설치 (호환성 문제 해결)
+  - Transformers 4.44.0 및 Sentence Transformers 5.1.2 설치
+  - LangChain 및 FAISS-CPU (AVX2) 설치
+  - 30개 AI API 엔드포인트 활성화
+  - 더미 API 라우터 제거
+  - 기능 검증 완료:
+    - SentenceTransformer 임베딩 생성 (384차원, 3개 텍스트 0.36초)
+    - FAISS 벡터 인덱스 생성 및 로딩 (AVX2 최적화)
+    - 모델 로딩 시간: 약 5초
