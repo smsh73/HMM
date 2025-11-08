@@ -14,6 +14,8 @@ import {
   Chip,
   LinearProgress,
   Alert,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import { Download as DownloadIcon, Delete as DeleteIcon, PlayArrow as PlayIcon, Stop as StopIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
