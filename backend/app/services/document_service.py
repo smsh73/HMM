@@ -10,7 +10,7 @@ from pathlib import Path
 from app.models.database import Document, DocumentChunk, User
 from app.parsers.parser_factory import ParserFactory
 from app.parsers.base import ParsedDocument
-from app.ai.rag_engine import RAGSearchEngine
+from app.ai.hybrid_rag_engine import HybridRAGEngine
 from app.services.cdc_service import CDCService
 from app.services.incremental_embedding_service import IncrementalEmbeddingService
 from app.core.config import settings
@@ -18,12 +18,17 @@ from app.core.logging import logger
 
 
 class DocumentService:
-    """문서 관리 서비스 (CDC 및 증분 임베딩 지원)"""
+    """문서 관리 서비스 (CDC 및 증분 임베딩 지원, Hybrid RAG 사용)"""
     
     def __init__(self, db: Session):
         """문서 서비스 초기화"""
         self.db = db
-        self.rag_engine = RAGSearchEngine()
+        # Hybrid RAG 엔진 사용 (Chroma + BM25)
+        self.rag_engine = HybridRAGEngine(
+            collection_name="documents",
+            vector_weight=0.7,
+            keyword_weight=0.3
+        )
         self.cdc_service = CDCService()
         self.incremental_embedding_service = IncrementalEmbeddingService()
     

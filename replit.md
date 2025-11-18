@@ -186,15 +186,36 @@ LOG_LEVEL=INFO
 - 대용량 문서(수천 청크) 업데이트 시 시간 소요
 - 임베딩 ID 연속성 미보장 (메타데이터/권한 연결 고려 필요)
 
-### 2단계: Chroma + HNSW + 하이브리드 검색 🚧 (진행 중)
+### 2단계: Chroma + HNSW + 하이브리드 검색 ✅ (완료)
 **목표**: 고성능 벡터 검색 및 키워드 결합 검색
 
-**계획**:
-- 🚧 Chroma 벡터 DB 통합 (FAISS 대체)
-- 🚧 HNSW 인덱싱 알고리즘 적용
-- 🚧 하이브리드 검색 (벡터 유사도 + BM25 키워드)
-- 🚧 저사양 최적화 (M=16, ef_construction=100, ef_search=50)
-- 🚧 영속성 및 스냅샷 관리
+**구현 완료**:
+- ✅ Chroma 벡터 DB 통합 (FAISS 대체)
+  - ChromaDB 1.3+ 사용
+  - PersistentClient로 자동 영속성
+  - 재시작 시 자동 로드
+- ✅ HNSW 인덱싱 알고리즘 적용
+  - M=16 (메모리 최적화)
+  - ef_construction=100 (빌드 품질)
+  - ef_search=50 (검색 정확도)
+  - 코사인 유사도 사용
+- ✅ BM25 키워드 검색
+  - rank-bm25 라이브러리
+  - 한글/영문 토큰화
+  - TF-IDF 확률론적 변형
+- ✅ 하이브리드 검색 엔진
+  - RRF (Reciprocal Rank Fusion) 방식
+  - 벡터 0.7 + 키워드 0.3 가중치
+  - 검색 모드: hybrid, vector, keyword
+- ✅ 문서 서비스 Chroma 통합
+  - DocumentService에 Hybrid RAG 적용
+  - 기존 FAISS 대신 Chroma 사용
+- ✅ 로컬 SLM (Small Language Model)
+  - Hugging Face transformers 기반
+  - CPU 전용 최적화 (맥북 인텔 환경)
+  - 권장 모델: Microsoft Phi-2, Google Gemma 2B
+  - 한글 모델: KoAlpaca, KULLM
+  - 로컬 실행 (인터넷 불필요)
 
 ### 3단계: 오프라인 모드 📅 (계획)
 **목표**: 완전한 로컬 동작 (인터넷 불필요)
