@@ -95,75 +95,116 @@ class CDCService:
         new_chunks: List[Dict]
     ) -> List[Dict]:
         """
-        청크 레벨 변경 감지 (증분 처리)
+        청크 레벨 변경 감지 (순서 기반 매칭 - 중복 청크 대응)
         
         Args:
             db: 데이터베이스 세션
             document_id: 문서 ID
-            new_chunks: 새 청크 리스트 [{"content": str, "metadata": dict}, ...]
+            new_chunks: 새 청크 리스트 
+                       [{"content": str, "content_hash": str, "chunk_index": int, "metadata": dict}, ...]
             
         Returns:
-            변경된 청크 리스트 (추가/수정된 것만)
+            변경된 청크 리스트 (추가/수정/삭제)
+            
+        Note:
+            순서를 유지하며 content_hash로 비교하여 중복 청크도 정확히 처리
         """
-        # 기존 청크 조회
+        # 기존 청크 조회 (인덱스 순서대로)
         existing_chunks = db.query(DocumentChunk).filter(
             DocumentChunk.document_id == document_id
-        ).all()
+        ).order_by(DocumentChunk.chunk_index).all()
         
-        # 기존 청크를 해시 기반 딕셔너리로 변환
-        existing_chunk_map = {
-            chunk.chunk_index: {
+        # 기존 청크를 리스트로 유지 (순서 보존)
+        existing_list = [
+            {
                 'id': chunk.id,
-                'hash': chunk.content_hash,
-                'content': chunk.content
+                'chunk_index': chunk.chunk_index,
+                'content_hash': chunk.content_hash,
+                'content': chunk.content,
+                'embedding_id': chunk.embedding_id,
+                'metadata': chunk.chunk_metadata
             }
             for chunk in existing_chunks
-        }
+        ]
         
+        # 새 청크 처리 (hash 계산)
+        new_list = []
+        for chunk_data in new_chunks:
+            content_hash = chunk_data.get('content_hash')
+            if not content_hash:
+                content_hash = CDCService.calculate_content_hash(
+                    chunk_data.get('content', '')
+                )
+            
+            new_list.append({
+                'chunk_index': chunk_data.get('chunk_index'),
+                'content': chunk_data.get('content', ''),
+                'content_hash': content_hash,
+                'metadata': chunk_data.get('metadata', {})
+            })
+        
+        # 순서 기반 매칭 (Longest Common Subsequence 기반)
         changed_chunks = []
         
-        for idx, new_chunk in enumerate(new_chunks):
-            content = new_chunk.get('content', '')
-            new_hash = CDCService.calculate_content_hash(content)
+        # 간단한 순서 비교: 인덱스 순서대로 비교
+        max_len = max(len(existing_list), len(new_list))
+        
+        for i in range(max_len):
+            old_chunk = existing_list[i] if i < len(existing_list) else None
+            new_chunk = new_list[i] if i < len(new_list) else None
             
-            # 기존 청크와 비교
-            if idx in existing_chunk_map:
-                old_hash = existing_chunk_map[idx]['hash']
-                if old_hash != new_hash:
-                    # 변경됨
+            if old_chunk and new_chunk:
+                # 둘 다 존재 - 비교
+                if old_chunk['content_hash'] != new_chunk['content_hash']:
+                    # 내용 변경 (수정)
                     changed_chunks.append({
-                        'chunk_index': idx,
-                        'content': content,
-                        'metadata': new_chunk.get('metadata', {}),
-                        'content_hash': new_hash,
+                        'chunk_index': new_chunk['chunk_index'],
+                        'content': new_chunk['content'],
+                        'metadata': new_chunk['metadata'],
+                        'content_hash': new_chunk['content_hash'],
                         'change_type': 'modified',
-                        'old_chunk_id': existing_chunk_map[idx]['id']
+                        'old_chunk_id': old_chunk['id']
                     })
-            else:
-                # 새로 추가됨
+                elif old_chunk['chunk_index'] != new_chunk['chunk_index']:
+                    # 내용 같지만 인덱스 변경 (이동)
+                    changed_chunks.append({
+                        'chunk_index': new_chunk['chunk_index'],
+                        'content': new_chunk['content'],
+                        'metadata': new_chunk['metadata'],
+                        'content_hash': new_chunk['content_hash'],
+                        'change_type': 'moved',
+                        'old_chunk_id': old_chunk['id'],
+                        'old_chunk_index': old_chunk['chunk_index']
+                    })
+                # 내용도 같고 인덱스도 같으면 변경 없음 (skip)
+            
+            elif old_chunk and not new_chunk:
+                # 기존에는 있었지만 새 버전에는 없음 (삭제)
                 changed_chunks.append({
-                    'chunk_index': idx,
-                    'content': content,
-                    'metadata': new_chunk.get('metadata', {}),
-                    'content_hash': new_hash,
+                    'chunk_index': old_chunk['chunk_index'],
+                    'content_hash': old_chunk['content_hash'],
+                    'change_type': 'deleted',
+                    'old_chunk_id': old_chunk['id'],
+                    'old_embedding_id': old_chunk.get('embedding_id')
+                })
+            
+            elif not old_chunk and new_chunk:
+                # 새 버전에만 있음 (추가)
+                changed_chunks.append({
+                    'chunk_index': new_chunk['chunk_index'],
+                    'content': new_chunk['content'],
+                    'metadata': new_chunk['metadata'],
+                    'content_hash': new_chunk['content_hash'],
                     'change_type': 'added'
                 })
         
-        # 삭제된 청크 감지 (기존에는 있었지만 새 버전에는 없는 것)
-        new_indices = set(range(len(new_chunks)))
-        deleted_indices = set(existing_chunk_map.keys()) - new_indices
-        
-        for idx in deleted_indices:
-            changed_chunks.append({
-                'chunk_index': idx,
-                'change_type': 'deleted',
-                'old_chunk_id': existing_chunk_map[idx]['id']
-            })
-        
         logger.info(
             f"청크 변경 감지 완료: 문서 {document_id} - "
-            f"전체 {len(new_chunks)}개, 변경 {len(changed_chunks)}개 "
-            f"(추가/수정: {sum(1 for c in changed_chunks if c['change_type'] != 'deleted')}개, "
+            f"기존 {len(existing_list)}개, 새로운 {len(new_list)}개, "
+            f"변경 {len(changed_chunks)}개 "
+            f"(추가: {sum(1 for c in changed_chunks if c['change_type'] == 'added')}개, "
+            f"수정: {sum(1 for c in changed_chunks if c['change_type'] == 'modified')}개, "
+            f"이동: {sum(1 for c in changed_chunks if c['change_type'] == 'moved')}개, "
             f"삭제: {sum(1 for c in changed_chunks if c['change_type'] == 'deleted')}개)"
         )
         

@@ -117,6 +117,7 @@ class IncrementalEmbeddingService:
         to_add = []
         to_modify = []
         to_delete = []
+        to_move = []
         
         for chunk_data in changed_chunks:
             change_type = chunk_data.get('change_type', 'added')
@@ -127,6 +128,8 @@ class IncrementalEmbeddingService:
                 to_add.append(chunk_data)
             elif change_type == 'modified':
                 to_modify.append(chunk_data)
+            elif change_type == 'moved':
+                to_move.append(chunk_data)
         
         # 1. 삭제된 청크 처리
         for chunk_data in to_delete:
@@ -147,6 +150,23 @@ class IncrementalEmbeddingService:
                 # DB에서 삭제
                 db.delete(old_chunk)
                 stats['deleted'] += 1
+        
+        # 1-1. 이동된 청크 처리 (내용 같고 인덱스만 변경 - 임베딩 재사용)
+        for chunk_data in to_move:
+            old_chunk_id = chunk_data.get('old_chunk_id')
+            if old_chunk_id:
+                chunk = db.query(DocumentChunk).filter(
+                    DocumentChunk.id == old_chunk_id
+                ).first()
+                
+                if chunk:
+                    # 인덱스만 업데이트 (임베딩은 재사용)
+                    chunk.chunk_index = chunk_data['chunk_index']
+                    logger.debug(
+                        f"청크 인덱스 업데이트: {old_chunk_id} - "
+                        f"{chunk_data.get('old_chunk_index')} → {chunk_data['chunk_index']}"
+                    )
+                    # moved는 modified에 포함시키지 않음 (stats는 별도 카운트 가능)
         
         # 2. 추가/수정된 청크 처리
         chunks_to_process = to_add + to_modify
