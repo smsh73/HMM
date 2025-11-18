@@ -35,17 +35,42 @@ class Document(Base):
     file_type = Column(String, nullable=False)  # pdf, docx, xlsx, txt
     file_path = Column(String, nullable=False)
     file_size = Column(Integer, nullable=False)
+    file_hash = Column(String, nullable=True, index=True)  # SHA-256 해시 (변경 감지용)
+    previous_hash = Column(String, nullable=True)  # 이전 버전 해시
+    version = Column(Integer, default=1)  # 문서 버전
     upload_date = Column(DateTime, default=datetime.utcnow)
+    last_modified = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     parsed_content = Column(JSON)  # 파싱된 내용 구조
     doc_metadata = Column(JSON)  # 문서 메타데이터 (metadata는 SQLAlchemy 예약어)
     created_by = Column(String, ForeignKey("users.id"))
     is_parsed = Column(Boolean, default=False)
     is_indexed = Column(Boolean, default=False)
+    needs_reindex = Column(Boolean, default=False)  # 증분 인덱싱 플래그
     
     # 관계
     creator = relationship("User", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
     permissions = relationship("Permission", back_populates="document", cascade="all, delete-orphan")
+    versions = relationship("DocumentVersion", back_populates="document", cascade="all, delete-orphan")
+
+
+class DocumentVersion(Base):
+    """문서 버전 이력 모델 (CDC용)"""
+    __tablename__ = "document_versions"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = Column(String, ForeignKey("documents.id"), nullable=False)
+    version = Column(Integer, nullable=False)
+    file_hash = Column(String, nullable=False)  # 해당 버전의 SHA-256 해시
+    file_path = Column(String)  # 버전별 파일 경로 (옵션)
+    change_type = Column(String, default="modified")  # created, modified, deleted
+    changed_chunks = Column(JSON)  # 변경된 청크 ID 리스트
+    delta_size = Column(Integer, default=0)  # 증분 데이터 크기
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(String, ForeignKey("users.id"))
+    
+    # 관계
+    document = relationship("Document", back_populates="versions")
 
 
 class DocumentChunk(Base):
@@ -58,7 +83,9 @@ class DocumentChunk(Base):
     content = Column(Text, nullable=False)
     chunk_metadata = Column(JSON)  # 청크 메타데이터 (페이지 번호, 섹션 등)
     embedding_id = Column(String)  # 벡터 DB의 ID
+    content_hash = Column(String)  # 청크 콘텐츠 해시 (변경 감지용)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # 관계
     document = relationship("Document", back_populates="chunks")
