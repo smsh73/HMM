@@ -255,7 +255,7 @@ class IncrementalEmbeddingService:
         user_id: str
     ) -> Dict:
         """
-        문서 재인덱싱 처리 (증분 방식)
+        문서 재인덱싱 처리 (증분 방식, 복잡도 초과 시 전체 재인덱싱)
         
         Args:
             db: 데이터베이스 세션
@@ -272,10 +272,17 @@ class IncrementalEmbeddingService:
         
         logger.info(f"증분 재인덱싱 시작: {document.filename}")
         
-        # 1. 청크 레벨 변경 감지
+        # 1. 청크 레벨 변경 감지 (LCS 기반)
         changed_chunks = self.cdc_service.detect_chunk_changes(
             db, document_id, new_chunks
         )
+        
+        # 복잡도 초과 시 None 반환 → 전체 재인덱싱
+        if changed_chunks is None:
+            logger.warning(
+                f"복잡도 초과로 전체 재인덱싱 수행: {document.filename}"
+            )
+            return self._full_reindex(db, document_id, new_chunks, user_id)
         
         if not changed_chunks:
             logger.info(f"변경사항 없음: {document.filename}")
@@ -301,6 +308,107 @@ class IncrementalEmbeddingService:
         db.commit()
         
         logger.info(f"증분 재인덱싱 완료: {document.filename} - 통계={stats}")
+        
+        return stats
+    
+    def _full_reindex(
+        self,
+        db: Session,
+        document_id: str,
+        new_chunks: List[Dict],
+        user_id: str
+    ) -> Dict:
+        """
+        전체 재인덱싱 (복잡도 초과 또는 강제 재인덱싱 시)
+        
+        Args:
+            db: 데이터베이스 세션
+            document_id: 문서 ID
+            new_chunks: 새 청크 리스트
+            user_id: 사용자 ID
+            
+        Returns:
+            처리 결과 통계
+        """
+        document = db.query(Document).filter(Document.id == document_id).first()
+        if not document:
+            raise ValueError(f"문서를 찾을 수 없습니다: {document_id}")
+        
+        logger.info(f"전체 재인덱싱 시작: {document.filename}")
+        
+        # 1. 기존 청크 및 임베딩 삭제
+        existing_chunks = db.query(DocumentChunk).filter(
+            DocumentChunk.document_id == document_id
+        ).all()
+        
+        deleted_count = 0
+        for chunk in existing_chunks:
+            if chunk.embedding_id:
+                try:
+                    self.vector_store.delete_document(chunk.embedding_id)
+                    deleted_count += 1
+                except Exception as e:
+                    logger.warning(f"벡터 삭제 실패: {chunk.embedding_id}, {str(e)}")
+            db.delete(chunk)
+        
+        db.commit()
+        
+        # 2. 새 청크 임베딩 생성
+        texts = [c['content'] for c in new_chunks]
+        metadatas = [
+            {
+                'document_id': document_id,
+                'document_name': document.filename,
+                'chunk_index': c['chunk_index'],
+                'chunk_metadata': c.get('metadata', {}),
+                'text': c['content'][:500]
+            }
+            for c in new_chunks
+        ]
+        
+        logger.info(f"임베딩 생성 시작: {len(texts)}개 청크")
+        embeddings = self.embedding_generator.generate_embeddings(texts)
+        
+        # 3. 벡터 DB에 추가
+        vector_ids = self.vector_store.add_documents(texts, metadatas)
+        
+        # 4. DB에 청크 저장
+        for idx, (chunk_data, vector_id) in enumerate(zip(new_chunks, vector_ids)):
+            new_chunk = DocumentChunk(
+                document_id=document_id,
+                chunk_index=chunk_data['chunk_index'],
+                content=chunk_data['content'],
+                chunk_metadata=chunk_data.get('metadata', {}),
+                content_hash=chunk_data['content_hash'],
+                embedding_id=vector_id
+            )
+            db.add(new_chunk)
+        
+        # 5. 버전 기록 (전체 재인덱싱)
+        self.cdc_service.record_document_version(
+            db, document_id, document.file_hash, 
+            [{'chunk_index': i, 'change_type': 'recreated'} for i in range(len(new_chunks))],
+            user_id
+        )
+        
+        # 6. 문서 상태 업데이트
+        document.needs_reindex = False
+        document.is_indexed = True
+        db.commit()
+        
+        stats = {
+            'total_chunks': len(new_chunks),
+            'added': len(new_chunks),
+            'modified': 0,
+            'deleted': deleted_count,
+            'skipped_duplicates': 0,
+            'full_reindex': True
+        }
+        
+        logger.info(
+            f"전체 재인덱싱 완료: {document.filename} - "
+            f"삭제={deleted_count}, 추가={len(new_chunks)}"
+        )
         
         return stats
     
