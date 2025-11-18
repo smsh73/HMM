@@ -57,9 +57,13 @@ class ChromaVectorStore:
             raise ImportError("chromadb가 설치되지 않았습니다. pip install chromadb")
         
         self.collection_name = collection_name
-        self.persist_directory = persist_directory or os.path.join(
-            settings.DATA_DIR, "chroma_db"
-        )
+        # settings.DATA_DIR 대신 VECTOR_DB_PATH 사용 (또는 기본 경로)
+        if persist_directory:
+            self.persist_directory = persist_directory
+        elif hasattr(settings, 'VECTOR_DB_PATH'):
+            self.persist_directory = settings.VECTOR_DB_PATH
+        else:
+            self.persist_directory = "./data/chroma_db"
         
         # HNSW 파라미터 (저사양 최적화)
         self.hnsw_config = {

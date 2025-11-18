@@ -71,7 +71,9 @@ class LocalSLMProvider(LLMProvider):
         
         # 캐시 디렉토리 설정
         if cache_dir is None:
-            cache_dir = str(Path(settings.DATA_DIR) / "huggingface_cache")
+            # settings.DATA_DIR이 없으면 기본 경로 사용
+            data_dir = getattr(settings, 'DATA_DIR', './data')
+            cache_dir = str(Path(data_dir) / "huggingface_cache")
         self.cache_dir = cache_dir
         Path(cache_dir).mkdir(parents=True, exist_ok=True)
         
@@ -188,6 +190,10 @@ class LocalSLMProvider(LLMProvider):
         except Exception as e:
             logger.error(f"텍스트 생성 실패: {e}")
             raise
+    
+    def is_available(self) -> bool:
+        """프로바이더 사용 가능 여부"""
+        return self.pipeline is not None
     
     async def generate_stream(self, prompt: str, **kwargs):
         """

@@ -54,11 +54,66 @@ class HybridSearchEngine:
         self.vector_weight = vector_weight / total_weight
         self.keyword_weight = keyword_weight / total_weight
         
+        # BM25 영속성: Chroma에서 기존 문서 로드하여 BM25 재구성
+        self._rebuild_bm25_from_chroma()
+        
         logger.info(
             f"하이브리드 검색 엔진 초기화: "
             f"벡터 가중치={self.vector_weight:.2f}, "
             f"키워드 가중치={self.keyword_weight:.2f}"
         )
+    
+    def _rebuild_bm25_from_chroma(self):
+        """
+        Chroma 컬렉션에서 기존 문서를 로드하여 BM25 인덱스 재구성
+        (영속성 문제 해결 - 재시작 시 BM25 복원)
+        
+        IMPORTANT: 재구성 전에 BM25 상태를 초기화하여 중복 및 삭제된 문서 방지
+        """
+        try:
+            # Chroma 컬렉션의 모든 문서 가져오기
+            count = self.vector_store.collection.count()
+            
+            if count == 0:
+                logger.info("BM25 재구성: Chroma 컬렉션이 비어있음")
+                return
+            
+            # 모든 문서 조회 (limit을 충분히 크게 설정)
+            results = self.vector_store.collection.get(
+                limit=count,
+                include=["metadatas", "documents"]
+            )
+            
+            if not results or not results['ids']:
+                logger.info("BM25 재구성: 문서를 찾을 수 없음")
+                return
+            
+            # CRITICAL: BM25 상태 초기화 (중복 및 삭제된 문서 방지)
+            self.keyword_search.reset()
+            
+            # BM25에 문서 추가
+            ids = results['ids']
+            documents = results['documents']
+            metadatas = results['metadatas']
+            
+            # Content 복원 (metadata에서 또는 documents에서)
+            texts = []
+            for i, doc in enumerate(documents):
+                # 메타데이터에 content가 있으면 사용, 없으면 documents 사용
+                if metadatas and i < len(metadatas) and 'content' in metadatas[i]:
+                    texts.append(metadatas[i]['content'])
+                elif doc:
+                    texts.append(doc)
+                else:
+                    texts.append("")
+            
+            # BM25 인덱스 재구성
+            self.keyword_search.add_documents(texts, metadatas, ids)
+            
+            logger.info(f"BM25 재구성 완료: {len(ids)}개 문서 로드")
+            
+        except Exception as e:
+            logger.warning(f"BM25 재구성 실패 (신규 컬렉션일 수 있음): {e}")
     
     def add_documents(
         self,
