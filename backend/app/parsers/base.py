@@ -6,6 +6,8 @@ from typing import Dict, List, Any
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.utils.multilingual_preprocessor import MultilingualPreprocessor
+
 
 @dataclass
 class DocumentMetadata:
@@ -44,6 +46,10 @@ class ParsedDocument:
 class DocumentParser(ABC):
     """문서 파서 기본 클래스"""
     
+    def __init__(self):
+        """파서 초기화"""
+        self.preprocessor = MultilingualPreprocessor()
+    
     @abstractmethod
     def parse(self, file_path: str) -> ParsedDocument:
         """문서 파싱"""
@@ -60,32 +66,32 @@ class DocumentParser(ABC):
         chunk_size: int = 1000,
         chunk_overlap: int = 200
     ) -> List[ContentChunk]:
-        """문서를 청크로 분할"""
-        chunks = []
-        start = 0
-        chunk_index = 0
+        """
+        문서를 청크로 분할 (다국어 지원)
         
-        while start < len(text):
-            end = start + chunk_size
-            chunk_text = text[start:end]
+        Args:
+            text: 청킹할 텍스트
+            chunk_size: 청크 크기
+            chunk_overlap: 청크 오버랩
             
-            # 문장 경계에서 자르기
-            if end < len(text):
-                last_period = chunk_text.rfind('.')
-                last_newline = chunk_text.rfind('\n')
-                cut_point = max(last_period, last_newline)
-                if cut_point > chunk_size * 0.5:  # 최소한 절반 이상은 유지
-                    chunk_text = chunk_text[:cut_point + 1]
-                    end = start + len(chunk_text)
-            
+        Returns:
+            ContentChunk 리스트
+        """
+        # 다국어 전처리기를 사용한 스마트 청킹
+        chunk_data = self.preprocessor.smart_chunk(
+            text,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap
+        )
+        
+        # ContentChunk 객체로 변환
+        chunks = []
+        for chunk_info in chunk_data:
             chunks.append(ContentChunk(
-                content=chunk_text.strip(),
-                chunk_index=chunk_index,
-                metadata={"start": start, "end": end}
+                content=chunk_info["content"],
+                chunk_index=chunk_info["chunk_index"],
+                metadata=chunk_info.get("metadata", {})
             ))
-            
-            chunk_index += 1
-            start = end - chunk_overlap
         
         return chunks
 

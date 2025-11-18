@@ -9,6 +9,7 @@ from app.api import (
     performance,
     documents,
     search,
+    search_feedback,
     summary,
     llm_settings,
     models,
@@ -24,6 +25,7 @@ api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(documents.router)
 api_router.include_router(search.router)
+api_router.include_router(search_feedback.router)
 api_router.include_router(summary.router)
 api_router.include_router(permissions.router)
 api_router.include_router(performance.router)

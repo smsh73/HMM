@@ -8,9 +8,16 @@ Hugging Face Transformers 기반, 맥북 인텔 CPU 환경 최적화
 - google/gemma-2b-it (경량, 2B 파라미터)
 - microsoft/phi-2 (경량, 2.7B 파라미터)
 """
-import torch
 from typing import Optional, List, Dict, Any
 from pathlib import Path
+
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    torch = None
+    print("Warning: torch not available. Local SLM will not work.")
 
 try:
     from transformers import (
@@ -62,6 +69,8 @@ class LocalSLMProvider(LLMProvider):
         """
         if not HAS_TRANSFORMERS:
             raise ImportError("transformers가 설치되지 않았습니다. pip install transformers")
+        if not HAS_TORCH:
+            raise ImportError("torch가 설치되지 않았습니다. pip install torch")
         
         self.model_name = model_name
         self.device = device

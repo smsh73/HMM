@@ -10,7 +10,8 @@ from passlib.context import CryptContext
 from app.models.database import User
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pbkdf2_sha256 사용 (bcrypt 대신, Python 3.13 호환성)
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 class AuthService:

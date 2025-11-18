@@ -118,6 +118,25 @@ class SearchHistory(Base):
     
     # 관계
     user = relationship("User", back_populates="search_history")
+    feedbacks = relationship("SearchFeedback", back_populates="search")
+
+
+class SearchFeedback(Base):
+    """검색 피드백 모델"""
+    __tablename__ = "search_feedback"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    search_id = Column(String, ForeignKey("search_history.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    query = Column(String, nullable=False)  # 검색 쿼리 (검색 성능 분석용)
+    result_id = Column(String, nullable=False)  # 피드백 대상 결과 ID
+    feedback_type = Column(String, nullable=False)  # relevant, irrelevant, helpful, not_helpful
+    rating = Column(Integer)  # 평점 (1-5)
+    comment = Column(Text)  # 코멘트
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # 관계
+    search = relationship("SearchHistory", back_populates="feedbacks")
 
 
 class LLMProvider(Base):

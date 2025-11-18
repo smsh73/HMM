@@ -23,6 +23,11 @@ class TestModelRequest(BaseModel):
     prompt: str = "Hello"
 
 
+class ReplaceModelRequest(BaseModel):
+    old_model_id: str
+    new_model_id: str
+
+
 @router.post("/start")
 async def start_serving(
     request: StartServingRequest,
@@ -86,4 +91,36 @@ async def test_model(
         prompt=request.prompt
     )
     return result
+
+
+@router.post("/replace")
+async def replace_model(
+    request: ReplaceModelRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """모델 교체 (기존 모델 언로드 후 새 모델 로드)"""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자만 모델을 교체할 수 있습니다."
+        )
+    
+    serving_service = ModelServingService(db)
+    result = await serving_service.replace_model(
+        old_model_id=request.old_model_id,
+        new_model_id=request.new_model_id
+    )
+    return result
+
+
+@router.get("/current")
+async def get_current_model(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """현재 서빙 중인 모델 조회"""
+    serving_service = ModelServingService(db)
+    current_model = serving_service.get_current_serving_model()
+    return {"current_model": current_model}
 
