@@ -141,14 +141,16 @@ class HuggingFaceService:
             model_path = os.path.join(self.models_dir, model_id.replace("/", "_"))
             
             # 비동기 다운로드 (백그라운드)
-            # 주의: auto_serve는 세션 관리 문제로 현재 제한적으로 작동
-            # 향후 Celery 등 백그라운드 작업 큐로 개선 필요
+            # snapshot_download는 별도 스레드에서 실행하여 이벤트 루프 블로킹 방지
             async def download():
                 # 새 세션 생성 (요청 scope와 독립적)
                 from app.core.database import SessionLocal
+                import asyncio
                 db_session = SessionLocal()
                 try:
-                    snapshot_download(
+                    # 블로킹 함수를 별도 스레드에서 실행
+                    await asyncio.to_thread(
+                        snapshot_download,
                         repo_id=model_id,
                         local_dir=model_path,
                         local_dir_use_symlinks=False
