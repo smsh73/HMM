@@ -142,9 +142,10 @@ class LocalModel(Base):
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     model_name = Column(String, nullable=False, unique=True, index=True)  # ollama 모델명
-    model_type = Column(String, default="ollama")  # ollama, gpt4all 등
+    model_type = Column(String, default="ollama")  # ollama, gpt4all, transformers 등
     model_size = Column(Integer)  # 모델 크기 (bytes)
     is_downloaded = Column(Boolean, default=False)
+    is_serving = Column(Boolean, default=False)  # 서빙 중 여부
     download_progress = Column(Integer, default=0)  # 다운로드 진행률 (0-100)
     model_metadata = Column(JSON)  # 모델 메타데이터
     created_at = Column(DateTime, default=datetime.utcnow)

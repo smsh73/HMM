@@ -36,12 +36,16 @@ async def search_models(
 @router.post("/models/{model_id}/download")
 async def download_model(
     model_id: str,
+    auto_serve: bool = Query(False, description="다운로드 후 자동으로 서빙 시작"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Hugging Face 모델 다운로드"""
+    """Hugging Face 모델 다운로드 및 선택적 자동 서빙"""
     hf_service = HuggingFaceService(db)
-    result = await hf_service.download_model(model_id)
+    result = await hf_service.download_model(
+        model_id=model_id,
+        auto_serve=auto_serve
+    )
     return result
 
 

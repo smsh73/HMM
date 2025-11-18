@@ -140,29 +140,54 @@ class HuggingFaceService:
             # 모델 다운로드 경로
             model_path = os.path.join(self.models_dir, model_id.replace("/", "_"))
             
-            # 비동기 다운로드
+            # 비동기 다운로드 (백그라운드)
+            # 주의: auto_serve는 세션 관리 문제로 현재 제한적으로 작동
+            # 향후 Celery 등 백그라운드 작업 큐로 개선 필요
             async def download():
+                # 새 세션 생성 (요청 scope와 독립적)
+                from app.core.database import SessionLocal
+                db_session = SessionLocal()
                 try:
                     snapshot_download(
                         repo_id=model_id,
                         local_dir=model_path,
                         local_dir_use_symlinks=False
                     )
-                    local_model.is_downloaded = True
-                    local_model.download_progress = 100
-                    local_model.model_metadata = {
-                        **(local_model.model_metadata or {}),
-                        "model_path": model_path
-                    }
-                    self.db.commit()
+                    
+                    # 새 세션에서 모델 업데이트
+                    model = db_session.query(LocalModel).filter(
+                        LocalModel.model_name == model_id
+                    ).first()
+                    
+                    if model:
+                        model.is_downloaded = True
+                        model.download_progress = 100
+                        model.model_metadata = {
+                            **(model.model_metadata or {}),
+                            "model_path": model_path
+                        }
+                        db_session.commit()
+                        
+                        # auto_serve는 수동 서빙 권장 (백그라운드 태스크 제한)
+                        if auto_serve:
+                            model.model_metadata = {
+                                **(model.model_metadata or {}),
+                                "auto_serve_requested": True,
+                                "note": "수동 서빙 권장 - POST /api/serving/start 사용"
+                            }
+                            db_session.commit()
+                        
                 except Exception as e:
-                    local_model.download_progress = 0
-                    local_model.model_metadata = {
-                        **(local_model.model_metadata or {}),
-                        "error": str(e)
-                    }
-                    self.db.commit()
+                    if 'model' in locals():
+                        model.download_progress = 0
+                        model.model_metadata = {
+                            **(model.model_metadata or {}),
+                            "error": str(e)
+                        }
+                        db_session.commit()
                     raise
+                finally:
+                    db_session.close()
             
             # 백그라운드에서 다운로드 시작
             asyncio.create_task(download())

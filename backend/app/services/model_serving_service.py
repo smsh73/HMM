@@ -11,6 +11,10 @@ from pathlib import Path
 
 from app.models.database import LocalModel
 from app.core.config import settings
+from app.ai.local_slm import LocalSLMProvider
+
+# 모듈 레벨 싱글톤: 모든 서비스 인스턴스가 공유하는 서빙 모델 레지스트리
+_SERVING_MODELS_REGISTRY: Dict[str, Any] = {}
 
 
 class ModelServingService:
@@ -20,7 +24,8 @@ class ModelServingService:
         """모델 서빙 서비스 초기화"""
         self.db = db
         self.ollama_url = settings.OLLAMA_BASE_URL
-        self.serving_models = {}  # {model_id: process}
+        # 모듈 레벨 레지스트리 사용 (모든 인스턴스가 공유)
+        self.serving_models = _SERVING_MODELS_REGISTRY
     
     async def start_serving(
         self,
@@ -72,20 +77,94 @@ class ModelServingService:
             }
     
     async def _start_transformers_model(self, model_id: str) -> Dict[str, Any]:
-        """Transformers 모델 서빙 시작 (향후 구현)"""
-        # Transformers 모델은 직접 서빙하기보다는
-        # Ollama로 변환하거나 별도 서빙 서버 필요
-        return {
-            "status": "not_implemented",
-            "message": "Transformers 모델 직접 서빙은 향후 구현 예정입니다."
-        }
+        """Transformers 모델 서빙 시작 (LocalSLMProvider 사용)"""
+        try:
+            # 이미 서빙 중인지 확인
+            if model_id in self.serving_models:
+                return {
+                    "status": "already_running",
+                    "model": model_id,
+                    "message": "모델이 이미 서빙 중입니다."
+                }
+            
+            # 다운로드된 모델 확인
+            local_model = self.db.query(LocalModel).filter(
+                LocalModel.model_name == model_id,
+                LocalModel.is_downloaded == True
+            ).first()
+            
+            if not local_model:
+                return {
+                    "status": "error",
+                    "message": f"모델 {model_id}가 다운로드되어 있지 않습니다."
+                }
+            
+            # LocalSLMProvider로 모델 로딩
+            try:
+                model_path = local_model.model_metadata.get("model_path") if local_model.model_metadata else None
+                
+                slm_provider = LocalSLMProvider(
+                    model_name=model_id,
+                    device='cpu',
+                    cache_dir=model_path if model_path else None
+                )
+                
+                # 모델 로딩 확인
+                if not slm_provider.is_available():
+                    return {
+                        "status": "error",
+                        "message": f"모델 {model_id} 로딩에 실패했습니다."
+                    }
+                
+                # 서빙 모델 등록
+                self.serving_models[model_id] = slm_provider
+                
+                # 데이터베이스 업데이트
+                local_model.is_serving = True
+                local_model.model_metadata = {
+                    **(local_model.model_metadata or {}),
+                    "serving_status": "running",
+                    "device": "cpu"
+                }
+                self.db.commit()
+                
+                return {
+                    "status": "running",
+                    "model": model_id,
+                    "message": "모델 서빙이 시작되었습니다.",
+                    "device": "cpu",
+                    "model_info": slm_provider.get_model_info()
+                }
+                
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "message": f"모델 로딩 오류: {str(e)}"
+                }
+                
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"모델 서빙 시작 오류: {str(e)}"
+            }
     
     async def stop_serving(self, model_id: str) -> Dict[str, Any]:
         """모델 서빙 중지"""
         if model_id in self.serving_models:
-            process = self.serving_models[model_id]
-            process.terminate()
+            # LocalSLMProvider 인스턴스 제거
             del self.serving_models[model_id]
+            
+            # 데이터베이스 업데이트
+            local_model = self.db.query(LocalModel).filter(
+                LocalModel.model_name == model_id
+            ).first()
+            
+            if local_model:
+                local_model.is_serving = False
+                if local_model.model_metadata:
+                    local_model.model_metadata["serving_status"] = "stopped"
+                self.db.commit()
+            
             return {
                 "status": "stopped",
                 "model": model_id,
@@ -99,6 +178,18 @@ class ModelServingService:
     async def get_serving_status(self) -> List[Dict[str, Any]]:
         """서빙 중인 모델 상태 조회"""
         statuses = []
+        
+        # Transformers 모델 상태 (메모리에 로딩된 모델)
+        for model_id, slm_provider in self.serving_models.items():
+            model_info = slm_provider.get_model_info()
+            statuses.append({
+                "model_id": model_id,
+                "model_type": "transformers",
+                "status": "running",
+                "device": model_info.get("device", "cpu"),
+                "loaded": model_info.get("loaded", False),
+                "max_tokens": model_info.get("max_new_tokens", 0)
+            })
         
         # Ollama 모델 상태 확인
         try:
@@ -121,6 +212,26 @@ class ModelServingService:
     
     async def test_model(self, model_id: str, prompt: str = "Hello") -> Dict[str, Any]:
         """모델 테스트"""
+        # Transformers 모델 테스트
+        if model_id in self.serving_models:
+            try:
+                import asyncio
+                slm_provider = self.serving_models[model_id]
+                # generate는 async 함수이므로 await 사용
+                response = await slm_provider.generate(prompt, max_tokens=50)
+                return {
+                    "status": "success",
+                    "response": response,
+                    "model": model_id,
+                    "model_type": "transformers"
+                }
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "message": f"모델 테스트 오류: {str(e)}"
+                }
+        
+        # Ollama 모델 테스트
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
@@ -136,7 +247,8 @@ class ModelServingService:
                 return {
                     "status": "success",
                     "response": result.get("response", ""),
-                    "model": model_id
+                    "model": model_id,
+                    "model_type": "ollama"
                 }
         except Exception as e:
             return {
