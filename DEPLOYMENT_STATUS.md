@@ -1,162 +1,124 @@
-# 배포 상태
+# 배포 상태 및 접속 정보
 
-## 완료된 작업 ✅
+## 서버 상태
 
-1. **Python 가상환경 생성**: `venv` 디렉토리 생성 완료
-2. **백엔드 의존성 설치**: 대부분의 패키지 설치 완료
-3. **데이터베이스 초기화**: 모든 테이블 생성 완료 (12개 테이블)
-4. **프론트엔드 의존성 설치**: npm 패키지 설치 완료
+### 백엔드 서버
+- **URL**: http://localhost:8000
+- **API 문서**: http://localhost:8000/api/docs
+- **상태**: 실행 중
 
-## 알려진 문제 및 해결 방법
+### 프론트엔드 서버
+- **URL**: http://localhost:3000
+- **상태**: 실행 중
 
-### 1. 관리자 계정 생성 오류
+## CPU 기반 LLM/SLM 서빙
 
-**문제**: bcrypt와 passlib의 호환성 문제로 관리자 계정 자동 생성 실패
+### 확인 사항
+✅ PyTorch CPU 버전 설치 완료
+✅ Transformers 설치 완료
+✅ CPU 기반 모델 서빙 설정 완료
 
-**해결 방법 1: API를 통한 사용자 생성**
+### 사용 가능한 모델
+
+1. **microsoft/phi-2** (2.7B, 경량, 추천)
+   - 영어 특화
+   - 빠른 응답 속도
+   - 메모리 사용량: ~2GB
+
+2. **google/gemma-2b-it** (2B, 경량)
+   - Instruction-tuned
+   - 메모리 사용량: ~2GB
+
+3. **beomi/KoAlpaca-Polyglot-5.8B** (5.8B, 한글 특화)
+   - 한글 지원 우수
+   - 메모리 사용량: ~6GB
+
+4. **nlpai-lab/kullm-polyglot-5.8b-v2** (5.8B, 한글 특화)
+   - 한글 지원 우수
+   - 메모리 사용량: ~6GB
+
+## 모델 서빙 방법
+
+### 1. 웹 UI를 통한 서빙
+1. http://localhost:3000 접속
+2. 로그인 (admin/admin123)
+3. "모델 관리" 메뉴 클릭
+4. HuggingFace에서 모델 검색
+5. 모델 다운로드
+6. "서빙 시작" 클릭
+
+### 2. API를 통한 서빙
+
 ```bash
-# 백엔드 서버가 실행된 후
-curl -X POST "http://localhost:8000/api/auth/register" \
+# 1. 로그인하여 토큰 획득
+TOKEN=$(curl -X POST "http://localhost:8000/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin123"}' \
+  | jq -r '.access_token')
+
+# 2. 모델 서빙 시작
+curl -X POST "http://localhost:8000/api/serving/start" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "admin",
-    "email": "admin@hmm.com",
-    "password": "admin123",
-    "role": "admin"
+    "model_id": "microsoft/phi-2",
+    "model_type": "transformers"
   }'
 ```
 
-**해결 방법 2: Python 스크립트로 직접 생성**
-```python
-# backend/scripts/create_admin.py
-from app.core.database import SessionLocal
-from app.models.database import User
-from passlib.context import CryptContext
+## 테스트
 
-pwd_context = CryptContext(schemes=['pbkdf2_sha256'], deprecated='auto')
+### 채팅 테스트
+1. http://localhost:3000 접속
+2. "AI 채팅" 메뉴 클릭
+3. 메시지 입력 및 전송
+4. CPU 기반 모델로 응답 생성 확인
 
-db = SessionLocal()
-admin = User(
-    username="admin",
-    email="admin@hmm.com",
-    password_hash=pwd_context.hash("admin123"),
-    role="admin"
-)
-db.add(admin)
-db.commit()
-print("관리자 계정 생성 완료")
-db.close()
-```
-
-### 2. PyTorch 설치 문제
-
-**문제**: Python 3.13에서 PyTorch가 아직 완전히 지원되지 않을 수 있음
-
-**해결 방법**: 
-- CPU 기반 모델 사용 시 PyTorch 없이도 일부 기능 사용 가능
-- 필요시 Python 3.11 또는 3.12로 가상환경 재생성
-
-### 3. 일부 패키지 누락 가능성
-
-필요한 패키지가 누락된 경우:
+### API 테스트
 ```bash
-cd backend
-source ../venv/bin/activate
-pip install <패키지명> --no-cache-dir
+# 채팅 API 호출
+curl -X POST "http://localhost:8000/api/chat" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "안녕하세요",
+    "use_rag": false,
+    "use_main_system": true
+  }'
 ```
 
-## 서버 실행 방법
+## 성능 참고사항
 
-### 백엔드 서버 실행
-```bash
-cd "/Users/seungminlee/Downloads/HMM 2"
-source venv/bin/activate
-cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
+### CPU 기반 서빙 특성
+- **모델 로딩**: 30초 ~ 2분 (모델 크기에 따라)
+- **응답 생성**: 5~30초 (토큰 수에 따라)
+- **메모리 사용**: 2~8GB (모델 크기에 따라)
 
-**확인**: 브라우저에서 `http://localhost:8000/docs` 접속하여 API 문서 확인
-
-### 프론트엔드 실행
-```bash
-cd "/Users/seungminlee/Downloads/HMM 2/frontend"
-npm start
-```
-
-**확인**: 브라우저에서 `http://localhost:3000` 접속
-
-## 다음 단계
-
-1. **백엔드 서버 실행 확인**
-   - `http://localhost:8000/docs` 접속
-   - API 문서가 표시되면 정상
-
-2. **관리자 계정 생성**
-   - 위의 해결 방법 중 하나 사용
-
-3. **Sample Docs 처리** (선택사항)
-   ```bash
-   cd backend
-   source ../venv/bin/activate
-   python scripts/process_sample_docs.py
-   ```
-
-4. **프론트엔드 접속 및 로그인**
-   - `http://localhost:3000` 접속
-   - 생성한 관리자 계정으로 로그인
-
-## 생성된 테이블 목록
-
-다음 12개 테이블이 생성되었습니다:
-- `users`: 사용자 정보
-- `documents`: 문서 정보
-- `document_chunks`: 문서 청크
-- `document_versions`: 문서 버전
-- `permissions`: 권한 정보
-- `search_history`: 검색 기록
-- `search_feedback`: 검색 피드백
-- `llm_providers`: LLM 프로바이더 설정
-- `local_models`: 로컬 모델 정보
-- `rag_sync`: RAG 동기화 기록
-- `chat_conversations`: 채팅 대화
-- `chat_messages`: 채팅 메시지
-
-## 로그 확인
-
-### 백엔드 로그
-```bash
-tail -f backend/data/logs/app.log
-tail -f backend/data/logs/error.log
-```
-
-### 서버 상태 확인
-```bash
-# 포트 8000 사용 중인 프로세스 확인
-lsof -i :8000
-
-# 포트 3000 사용 중인 프로세스 확인
-lsof -i :3000
-```
+### 최적화 팁
+1. 경량 모델 사용 (phi-2, gemma-2b)
+2. 토큰 수 제한 (max_new_tokens=256)
+3. 한 번에 하나의 모델만 서빙
 
 ## 문제 해결
 
-### 서버가 시작되지 않는 경우
-1. 포트 충돌 확인
-2. 의존성 설치 확인: `pip list`
-3. 로그 파일 확인: `backend/data/logs/error.log`
+### 모델 로딩 실패
+- 인터넷 연결 확인 (초기 다운로드 필요)
+- 디스크 공간 확인 (모델당 2~10GB)
+- 메모리 확인 (최소 8GB 권장)
 
-### 프론트엔드가 시작되지 않는 경우
-1. Node.js 버전 확인: `node --version` (16 이상)
-2. `node_modules` 삭제 후 재설치:
-   ```bash
-   rm -rf node_modules package-lock.json
-   npm install --legacy-peer-deps
-   ```
+### 응답 속도가 느림
+- CPU 기반이므로 GPU 대비 느릴 수 있음
+- 경량 모델 사용 권장
+- 토큰 수 제한
 
-## 참고 문서
+### 메모리 부족
+- 더 작은 모델 사용
+- 다른 애플리케이션 종료
+- max_new_tokens 감소
 
-- `QUICK_START.md`: 빠른 시작 가이드
-- `DEPLOYMENT_GUIDE.md`: 상세 배포 가이드
-- `DEPLOY_STEPS.md`: 단계별 명령어
-- `IMPLEMENTATION_SUMMARY.md`: 구현 요약
+## 다음 단계
 
+1. 모델 다운로드 및 서빙 시작
+2. 채팅 기능 테스트
+3. RAG 기능 테스트 (문서 검색 + LLM)
+4. 성능 모니터링

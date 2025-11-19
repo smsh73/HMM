@@ -23,6 +23,18 @@ uploads/
 logs/
 vector_db/
 
+# Models (제외)
+**/huggingface_cache/
+**/models/
+**/*model*/
+backend/data/huggingface_cache/
+backend/data/vector_db/models/
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+
 # Environment
 .env
 .env.local

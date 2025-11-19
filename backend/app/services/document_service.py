@@ -15,6 +15,8 @@ from app.services.cdc_service import CDCService
 from app.services.incremental_embedding_service import IncrementalEmbeddingService
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.websocket_manager import websocket_manager
+import asyncio
 
 
 class DocumentService:
@@ -219,6 +221,9 @@ class DocumentService:
                 f"추가={stats['added']}, 수정={stats['modified']}, 삭제={stats['deleted']}"
             )
             
+            # 인덱싱 완료 이벤트 발행
+            self._emit_indexing_complete_event(document.id, user_id or document.created_by)
+            
             return stats
         
         else:
@@ -248,6 +253,9 @@ class DocumentService:
             self.db.refresh(document)
             
             logger.info(f"전체 인덱싱 완료: {document.filename} - {len(new_chunks_json)}개 청크")
+            
+            # 인덱싱 완료 이벤트 발행
+            self._emit_indexing_complete_event(document.id, user_id)
             
             return {
                 "total_chunks": len(new_chunks_json),
@@ -290,4 +298,47 @@ class DocumentService:
         self.db.commit()
         
         return True
+    
+    def _emit_indexing_complete_event(self, document_id: str, user_id: str = None):
+        """인덱싱 완료 이벤트 발행"""
+        try:
+            document = self.get_document(document_id)
+            if not document:
+                return
+            
+            # WebSocket을 통해 이벤트 브로드캐스트
+            event_message = {
+                "type": "indexing_complete",
+                "document_id": document_id,
+                "document_name": document.filename,
+                "user_id": user_id,
+                "message": f"문서 '{document.filename}'의 벡터 임베딩이 완료되었습니다."
+            }
+            
+            # 비동기 브로드캐스트 (이벤트 루프가 실행 중인 경우)
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(websocket_manager.broadcast(event_message))
+                else:
+                    loop.run_until_complete(websocket_manager.broadcast(event_message))
+            except RuntimeError:
+                # 이벤트 루프가 없는 경우 (동기 컨텍스트)
+                # 백그라운드 태스크로 실행
+                import threading
+                def broadcast():
+                    try:
+                        new_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(new_loop)
+                        new_loop.run_until_complete(websocket_manager.broadcast(event_message))
+                        new_loop.close()
+                    except Exception as e:
+                        logger.error(f"이벤트 브로드캐스트 실패: {e}")
+                
+                thread = threading.Thread(target=broadcast, daemon=True)
+                thread.start()
+            
+            logger.info(f"인덱싱 완료 이벤트 발행: {document.filename}")
+        except Exception as e:
+            logger.error(f"이벤트 발행 실패: {e}", exc_info=True)
 

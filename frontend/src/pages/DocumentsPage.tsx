@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Button,
@@ -21,10 +21,30 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
+import { useWebSocket } from '../hooks/useWebSocket';
+import IndexingCompleteDialog from '../components/IndexingCompleteDialog';
 
 const DocumentsPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogDocumentId, setDialogDocumentId] = useState<string>('');
+  const [dialogDocumentName, setDialogDocumentName] = useState<string>('');
   const queryClient = useQueryClient();
+
+  // WebSocket 연결
+  const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/delta-sync/ws`;
+  const { lastMessage } = useWebSocket(wsUrl);
+
+  // 인덱싱 완료 이벤트 처리
+  useEffect(() => {
+    if (lastMessage && lastMessage.type === 'indexing_complete') {
+      setDialogDocumentId(lastMessage.document_id);
+      setDialogDocumentName(lastMessage.document_name);
+      setDialogOpen(true);
+      // 문서 목록 새로고침
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    }
+  }, [lastMessage, queryClient]);
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ['documents'],
@@ -130,6 +150,13 @@ const DocumentsPage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <IndexingCompleteDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        documentId={dialogDocumentId}
+        documentName={dialogDocumentName}
+      />
     </Box>
   );
 };

@@ -12,6 +12,7 @@ import LLMSettingsPage from './pages/LLMSettingsPage';
 import ModelManagementPage from './pages/ModelManagementPage';
 import RAGSyncPage from './pages/RAGSyncPage';
 import ChatPage from './pages/ChatPage';
+import SystemRolePage from './pages/SystemRolePage';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 
 function AppContent() {
@@ -36,6 +37,7 @@ function AppContent() {
                 <Route path="/models" element={<ModelManagementPage />} />
                 <Route path="/rag-sync" element={<RAGSyncPage />} />
                 <Route path="/chat" element={<ChatPage />} />
+                <Route path="/system-role" element={<SystemRolePage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>

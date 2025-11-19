@@ -39,6 +39,7 @@ const menuItems = [
   { text: 'LLM 설정', icon: <SettingsIcon />, path: '/llm-settings' },
   { text: '모델 관리', icon: <ModelIcon />, path: '/models' },
   { text: 'RAG 동기화', icon: <SyncIcon />, path: '/rag-sync' },
+  { text: '시스템 역할', icon: <SettingsIcon />, path: '/system-role' },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {

@@ -16,7 +16,11 @@ from app.api import (
     rag_sync,
     huggingface,
     model_serving,
-    chat
+    chat,
+    system_role,
+    delta_sync,
+    offline,
+    monitoring
 )
 
 api_router = APIRouter()
@@ -35,4 +39,8 @@ api_router.include_router(rag_sync.router)
 api_router.include_router(huggingface.router)
 api_router.include_router(model_serving.router)
 api_router.include_router(chat.router)
+api_router.include_router(system_role.router)
+api_router.include_router(delta_sync.router)
+api_router.include_router(offline.router)
+api_router.include_router(monitoring.router)
 
