@@ -171,6 +171,44 @@ class LocalModel(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class SystemRole(Base):
+    """시스템 역할 모델 (메인서버/선박클라이언트)"""
+    __tablename__ = "system_roles"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    role = Column(String, nullable=False, unique=True)  # main_server, ship_client
+    system_name = Column(String)  # 시스템 이름
+    connection_ip = Column(String)  # 연결 IP 주소
+    connection_port = Column(Integer)  # 연결 포트
+    connection_token = Column(String)  # 인증 토큰
+    is_active = Column(Boolean, default=True)  # 활성화 여부
+    last_sync_at = Column(DateTime)  # 마지막 동기화 시간
+    config = Column(JSON)  # 추가 설정
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class DeltaPackage(Base):
+    """델타 패키지 모델"""
+    __tablename__ = "delta_packages"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    package_type = Column(String, nullable=False)  # document_add, document_update, document_delete
+    source_system = Column(String)  # 출발 시스템
+    target_system = Column(String)  # 대상 시스템
+    document_ids = Column(JSON)  # 변경된 문서 ID 리스트
+    chunk_ids = Column(JSON)  # 변경된 청크 ID 리스트
+    file_path = Column(String)  # 델타 파일 경로
+    file_size = Column(Integer)  # 파일 크기 (bytes)
+    checksum = Column(String)  # 파일 체크섬
+    status = Column(String, default="pending")  # pending, ready, sending, sent, failed
+    send_type = Column(String)  # immediate, scheduled
+    scheduled_at = Column(DateTime)  # 스케줄 전송 시간
+    sent_at = Column(DateTime)  # 전송 완료 시간
+    package_metadata = Column(JSON)  # 패키지 메타데이터 (metadata는 SQLAlchemy 예약어)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class RAGSync(Base):
     """RAG 동기화 기록 모델"""
     __tablename__ = "rag_sync"
